@@ -3,11 +3,12 @@ editor.setTheme("ace/theme/chrome");
 editor.session.setMode("ace/mode/json");
 editor.resize()
 
+// does not work locally
 fetch('./data/1.14/uk_ua.json')
     .then(res => res.json())
     .then(data => {
         editor.setValue(JSON.stringify(data, null, 4))
-        console.log(data)
+        //console.log(data)
     })
     .catch(err => console.error(err));
 
@@ -80,7 +81,8 @@ document.getElementById('save').addEventListener('click', function (e) {
         zip.generateAsync({ type: "blob" })
             .then(function (content) {
                 download(content, "pack.zip", "blob");
-            });
+            })
+            .catch(err => alert(`Помилка: ${err}`));
     } catch (err) {
         alert(`Помилка: ${err}`)
     }
