@@ -77,7 +77,7 @@ document.getElementById('save').addEventListener('click', function (e) {
         };
         zip.file("pack.mcmeta", JSON.stringify(metaObject, null, 4));
         var langFolder = zip.folder("assets/minecraft/lang");
-        langFolder.file(`${filename}`, text, { base64: true });
+        langFolder.file(`${filename}`, text, { base64: false });
         zip.generateAsync({ type: "blob" })
             .then(function (content) {
                 download(content, "pack.zip", "blob");
