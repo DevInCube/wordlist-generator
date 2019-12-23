@@ -36,16 +36,36 @@ function handleFileSelect(evt) {
     // Closure to capture the file information.
     reader.onload = (function (theFile) {
         return function (e) {
-
-            let originalText = e.target.result;
-            let jsonObj = JSON.parse(originalText);
-            let stringifiedText = JSON.stringify(jsonObj, null, 4);
-            editor.setValue(stringifiedText);
+            console.log(theFile, e.target)
+            if (theFile.type === 'application/json') {
+                editor.setValue(parse(e.target.result));
+            } else { // zip
+                var zip = new JSZip();
+                zip.loadAsync(e.target.result, { base64: false })
+                    .then(function (contents) {
+                        // @todo check contents for this file
+                        zip.file('assets/minecraft/lang/uk_ua.json')
+                            .async('string')
+                            .then(parse)
+                            .then(editor.setValue)
+                            .catch(err => alert(err))
+                    });
+            }
         };
     })(f);
 
     // Read in the image file as a data URL.
-    reader.readAsText(f);
+    if (f.type === 'application/json')
+        reader.readAsText(f);
+    else
+        reader.readAsBinaryString(f)
+}
+
+function parse(text) {
+    let originalText = text;
+    let jsonObj = JSON.parse(originalText);
+    let stringifiedText = JSON.stringify(jsonObj, null, 4);
+    return stringifiedText;
 }
 
 document.getElementById('upload').addEventListener('change', handleFileSelect, false);
@@ -64,13 +84,13 @@ document.getElementById('save').addEventListener('click', function (e) {
         var zip = new JSZip();
         let metaObject = {
             "pack": {
-                "pack_format": 4,
+                "pack_format": 4,  // 1.14
                 "description": "UA fixed"
             },
             "language": {
                 [langKey]: {
-                    "name": "Tutorial Language",
-                    "region": "Country/region name",
+                    "name": "Ukrainian",
+                    "region": "Ukraine",
                     "bidirectional": false
                 }
             }
