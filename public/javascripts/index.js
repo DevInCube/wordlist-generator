@@ -1,41 +1,82 @@
+const defaultPackFormat = 4;
 const defaultVersion = `1.14`;
 const defaultLanguageCode = `uk_ua`;
 
 const model = {
-    version: defaultVersion,
-    languageCode: defaultLanguageCode
+    languageCode: defaultLanguageCode,
+    uploaded: {
+        pack_format: defaultPackFormat,
+        lang: ``,
+    },
+    download: {
+        version: defaultVersion,
+    }
 };
 
-const versions = {
-    '1.14': {
-        pack_format: 4,
-    },
-    '1.15': {
-        pack_format: 5,
-    }
-}
+const formats = [
+    { pack_format: 4, versions: ['1.13', '1.14'] },
+    { pack_format: 5, versions: ['1.15'] },
+];
+const defaultFormat = formats.find(x => x.pack_format === defaultPackFormat);
 
 let editor = ace.edit("editor");
 editor.setTheme("ace/theme/chrome");
 editor.session.setMode("ace/mode/json");
 editor.resize();
 
+document.getElementById('type_new').addEventListener('click', onVersionChange, false)
+document.getElementById('type_upload').addEventListener('click', onUploaded, false)
+document.getElementById('download_format').addEventListener('click', onDownloadVersionChange, false)
 document.getElementById('upload').addEventListener('change', handleFileSelect, false);
 document.getElementById('save').addEventListener('click', onSaveResourcePack, false);
-document.getElementById('versions').addEventListener('change', onVersionChange, false);
+document.getElementById('new_format').addEventListener('change', onVersionChange, false);
 onVersionChange();
 
-function onVersionChange(event) {
-    let version = event ? event.target.value : defaultVersion;
-    model.version = version;
-    fetch(`./data/${version}/${defaultLanguageCode}.json`)
+function onDownloadVersionChange(event) {
+    model.download.version = event.target.value
+    try {
+        let currentJson = JSON.parse(editor.getValue());
+        fetchLangFileJson(model.download.version, model.languageCode)
+            .then(selectedJson => {
+                let newJson = Object.assign({}, selectedJson, currentJson);
+                editor.setValue(JSON.stringify(newJson, null, 4))
+            })
+            .catch(err => alert(err));
+    } catch (err) {
+        alert(err);
+    }
+}
+
+function onUploaded(event) {
+    if (model.uploaded.lang)
+        editor.setValue(parse(model.uploaded.lang))
+    else
+        editor.setValue('')
+    let versions = formats.find(x => x.pack_format === model.uploaded.pack_format).versions
+    let version = versions[versions.length - 1];  // take latest version
+    document.querySelector(`#download_format option[value='${version}']`).selected = true;
+}
+
+function fetchLangFileJson(version, langCode = defaultLanguageCode) {
+    return fetch(`./data/${version}/${langCode}.json`)
         .then(res => {
             if (res.status === 404)
                 throw new Error(`Файл версії ${version} не знайдено`);
             return res.json();
-        })
+        });
+}
+
+function onVersionChange(event) {
+    let version = document.getElementById('new_format').value;
+    let format = formats.find(x => x.versions.includes(version));
+    if (!format)
+        return alert(`Unsuppported version: ${version}`);
+    model.version = version;
+    fetchLangFileJson(version, model.languageCode)
         .then(data => {
             editor.setValue(JSON.stringify(data, null, 4))
+            document.getElementById('type_new').checked = true;
+            document.querySelector(`#download_format option[value='${version}']`).selected = true;
         })
         .catch(err => alert(`Помилка зміни версії: ${err}`));
 }
@@ -66,16 +107,21 @@ function handleFileSelect(evt) {
                     })
                     .then(([meta, lang]) => {
                         let metaJson = JSON.parse(meta);
-                        if (metaJson.pack.pack_format !== 4) {
+                        let uploadFormat = metaJson.pack.pack_format;
+                        let format = formats.find(x => x.pack_format === uploadFormat);
+                        if (!format) {
                             throw new Error('Ця версія Minecraft не підтримується')
                         }
+                        document.querySelector(`#upload_format option[value='${uploadFormat}']`).setAttribute('selected', true);
                         // @todo save as loaded format and show update button on format mismatch
+                        model.uploaded.lang = lang;
                         return lang;
                     })
                     .then(parse)
                     .then(editor.setValue.bind(editor))
                     .catch(err => alert(err));
             }
+            document.getElementById('type_upload').checked = true;
         };
     })(f);
 
@@ -88,27 +134,32 @@ function handleFileSelect(evt) {
 
 function onSaveResourcePack(event) {
     try {
-        let text = toUtf16Json(editor.getValue());
-        let langKey = model.languageCode;
-        let filename = `${langKey}.json`;
-        let zip = new JSZip();
-        let metaObject = {
-            "pack": {
-                "pack_format": versions[model.version].pack_format,
-                "description": "Ukrainian language resource pack"
-            },
-            "language": {
-                [langKey]: {
-                    "name": "Ukrainian",
-                    "region": "Ukraine",
-                    "bidirectional": false
-                }
-            }
-        };
-        zip.file("pack.mcmeta", JSON.stringify(metaObject, null, 4));
-        let langFolder = zip.folder("assets/minecraft/lang");
-        langFolder.file(`${filename}`, text, { base64: false });
-        zip.generateAsync({ type: "blob" })
+        let currentJson = JSON.parse(editor.getValue());
+        fetchLangFileJson(model.download.version, model.languageCode)
+            .then(selectedJson => {
+                let newJson = Object.assign({}, selectedJson, currentJson);
+                let text = toUtf16Json(newJson);
+                let langKey = model.languageCode;
+                let filename = `${langKey}.json`;
+                let zip = new JSZip();
+                let metaObject = {
+                    "pack": {
+                        "pack_format": formats.find(x => x.versions.includes(model.download.version)).pack_format,
+                        "description": "Ukrainian language resource pack"
+                    },
+                    "language": {
+                        [langKey]: {
+                            "name": "Ukrainian",
+                            "region": "Ukraine",
+                            "bidirectional": false
+                        }
+                    }
+                };
+                zip.file("pack.mcmeta", JSON.stringify(metaObject, null, 4));
+                let langFolder = zip.folder("assets/minecraft/lang");
+                langFolder.file(`${filename}`, text, { base64: false });
+                return zip.generateAsync({ type: "blob" })
+            })
             .then(function (content) {
                 download(content, `${model.languageCode}_resourcepack.zip`, "blob");
             })
@@ -145,9 +196,9 @@ function parse(text) {
     return stringifiedText;
 }
 
-function toUtf16Json(str) {
+function toUtf16Json(jsonObj) {
     let res = {};
-    for (let [k, v] of Object.entries(JSON.parse(str))) {
+    for (let [k, v] of Object.entries(jsonObj)) {
         res[k] = toUnicode(v);
     }
     let text = JSON.stringify(res, null, 4);

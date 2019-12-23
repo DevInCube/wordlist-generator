@@ -26,13 +26,43 @@
 
 <body>
     <form enctype="multipart/form-data">
-        <input id="upload" type="file" accept="text,application/json,application/zip" name="files[]" size="30">
-        <select id="versions">
-            <option value="1.14" selected>1.14</option>
-            <option value="1.15" disabled>1.15</option>
-        </select>
-        <input type="text" disabled value="uk_ua" size="1">
-        <input id="save" type="button" value="Зберегти">
+        <fieldset>
+            <legend>Заданий ресурспак</legend>
+            <p>
+                <input type="radio" name="type" id="type_new" value="new" checked>
+                <label for="type_new">Новий:</label>
+                <span>
+
+                    <select id="new_format">
+                        <option value="1.14" selected>1.14</option>
+                        <option value="1.15" >1.15</option>
+                    </select>
+                    <input id="new_lang" type="text" disabled value="uk_ua" size="1">
+                </span>
+            </p>
+            <p>
+                <input type="radio" name="type" id="type_upload" value="upload">
+                <label for="type_upload">Існуючий</label>
+                <span>
+                    <input id="upload" type="file" accept="text,application/json,application/zip" name="files[]"
+                        size="30">
+                    <select id="upload_format" disabled>
+                        <option value="4" selected>1.13-1.14</option>
+                        <option value="5">1.15</option>
+                    </select>
+                    <input id="upload_lang" type="text" disabled value="uk_ua" size="1">
+                </span>
+            </p>
+        </fieldset>
+        <fieldset>
+            <legend>Створений ресурспак</legend>
+            <select id="download_format">
+                <option value="1.14" selected>1.14</option>
+                <option value="1.15" >1.15</option>
+            </select>
+            <input id="save" type="button" value="Зберегти">
+
+        </fieldset>
     </form>
 
     <div id="parent">
