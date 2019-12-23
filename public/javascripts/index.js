@@ -12,15 +12,15 @@ fetch('./data/1.14/uk_ua.json')
     })
     .catch(err => console.error(err));
 
-String.prototype.toUnicode = function () {
+function toUnicode(str) {
     var result = "";
-    for (var i = 0; i < this.length; i++) {
+    for (var i = 0; i < str.length; i++) {
         // Assumption: all characters are < 0xffff
-        let code = this[i].charCodeAt(0);
+        let code = str[i].charCodeAt(0);
         if (code > 127)
             result += "\\u" + ("000" + code.toString(16)).substr(-4);
         else
-            result += this[i]
+            result += str[i]
     }
     return result;
 };
@@ -36,7 +36,7 @@ function handleFileSelect(evt) {
     // Closure to capture the file information.
     reader.onload = (function (theFile) {
         return function (e) {
-            console.log(theFile, e.target)
+            //console.log(theFile, e.target)
             if (theFile.type === 'application/json') {
                 editor.setValue(parse(e.target.result));
             } else { // zip
@@ -47,7 +47,7 @@ function handleFileSelect(evt) {
                         zip.file('assets/minecraft/lang/uk_ua.json')
                             .async('string')
                             .then(parse)
-                            .then(editor.setValue)
+                            .then(val => editor.setValue(val))
                             .catch(err => alert(err))
                     });
             }
@@ -74,7 +74,7 @@ document.getElementById('save').addEventListener('click', function (e) {
         let text = editor.getValue();
         let res = {};
         for (let [k, v] of Object.entries(JSON.parse(text))) {
-            res[k] = v.toUnicode();
+            res[k] = toUnicode(v);
         }
         text = JSON.stringify(res, null, 4);
         text = text.replace(/\\\\u/g, '\\u');
