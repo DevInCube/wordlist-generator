@@ -1,0 +1,24 @@
+{
+  "name": "minecraft-localizer",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "http-server . -p 45892 -c-1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DevInCube/minecraft-localizer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DevInCube/minecraft-localizer/issues"
+  },
+  "homepage": "https://github.com/DevInCube/minecraft-localizer#readme",
+  "devDependencies": {
+    "http-server": "^0.12.0"
+  }
+}

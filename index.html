@@ -27,6 +27,11 @@
 <body>
     <form enctype="multipart/form-data">
         <input id="upload" type="file" accept="text,application/json,application/zip" name="files[]" size="30">
+        <select id="versions">
+            <option value="1.14" selected>1.14</option>
+            <option value="1.15" disabled>1.15</option>
+        </select>
+        <input type="text" disabled value="uk_ua" size="1">
         <input id="save" type="button" value="Зберегти">
     </form>
 

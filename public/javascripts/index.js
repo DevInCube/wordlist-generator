@@ -1,37 +1,52 @@
-var editor = ace.edit("editor");
-editor.setTheme("ace/theme/chrome");
-editor.session.setMode("ace/mode/json");
-editor.resize()
+const defaultVersion = `1.14`;
+const defaultLanguageCode = `uk_ua`;
 
-// does not work locally
-fetch('./data/1.14/uk_ua.json')
-    .then(res => res.json())
-    .then(data => {
-        editor.setValue(JSON.stringify(data, null, 4))
-        //console.log(data)
-    })
-    .catch(err => console.error(err));
-
-function toUnicode(str) {
-    var result = "";
-    for (var i = 0; i < str.length; i++) {
-        // Assumption: all characters are < 0xffff
-        let code = str[i].charCodeAt(0);
-        if (code > 127)
-            result += "\\u" + ("000" + code.toString(16)).substr(-4);
-        else
-            result += str[i]
-    }
-    return result;
+const model = {
+    version: defaultVersion,
+    languageCode: defaultLanguageCode
 };
 
+const versions = {
+    '1.14': {
+        pack_format: 4,
+    },
+    '1.15': {
+        pack_format: 5,
+    }
+}
+
+let editor = ace.edit("editor");
+editor.setTheme("ace/theme/chrome");
+editor.session.setMode("ace/mode/json");
+editor.resize();
+
+document.getElementById('upload').addEventListener('change', handleFileSelect, false);
+document.getElementById('save').addEventListener('click', onSaveResourcePack, false);
+document.getElementById('versions').addEventListener('change', onVersionChange, false);
+onVersionChange();
+
+function onVersionChange(event) {
+    let version = event ? event.target.value : defaultVersion;
+    model.version = version;
+    fetch(`./data/${version}/${defaultLanguageCode}.json`)
+        .then(res => {
+            if (res.status === 404)
+                throw new Error(`Файл версії ${version} не знайдено`);
+            return res.json();
+        })
+        .then(data => {
+            editor.setValue(JSON.stringify(data, null, 4))
+        })
+        .catch(err => alert(`Помилка зміни версії: ${err}`));
+}
+
 function handleFileSelect(evt) {
-    var files = evt.target.files; // FileList object
+    let files = evt.target.files; // FileList object
 
     // use the 1st file from the list
     f = files[0];
 
-    var reader = new FileReader();
+    let reader = new FileReader();
 
     // Closure to capture the file information.
     reader.onload = (function (theFile) {
@@ -40,16 +55,26 @@ function handleFileSelect(evt) {
             if (theFile.type === 'application/json') {
                 editor.setValue(parse(e.target.result));
             } else { // zip
-                var zip = new JSZip();
+                let zip = new JSZip();
                 zip.loadAsync(e.target.result, { base64: false })
                     .then(function (contents) {
                         // @todo check contents for this file
-                        zip.file('assets/minecraft/lang/uk_ua.json')
-                            .async('string')
-                            .then(parse)
-                            .then(val => editor.setValue(val))
-                            .catch(err => alert(err))
-                    });
+                        return Promise.all([
+                            zip.file(`pack.mcmeta`).async('string'),
+                            zip.file(`assets/minecraft/lang/${model.languageCode}.json`).async('string')
+                        ]);
+                    })
+                    .then(([meta, lang]) => {
+                        let metaJson = JSON.parse(meta);
+                        if (metaJson.pack.pack_format !== 4) {
+                            throw new Error('Ця версія Minecraft не підтримується')
+                        }
+                        // @todo save as loaded format and show update button on format mismatch
+                        return lang;
+                    })
+                    .then(parse)
+                    .then(editor.setValue.bind(editor))
+                    .catch(err => alert(err));
             }
         };
     })(f);
@@ -57,35 +82,20 @@ function handleFileSelect(evt) {
     // Read in the image file as a data URL.
     if (f.type === 'application/json')
         reader.readAsText(f);
-    else
+    else  // application/zip
         reader.readAsBinaryString(f)
 }
 
-function parse(text) {
-    let originalText = text;
-    let jsonObj = JSON.parse(originalText);
-    let stringifiedText = JSON.stringify(jsonObj, null, 4);
-    return stringifiedText;
-}
-
-document.getElementById('upload').addEventListener('change', handleFileSelect, false);
-document.getElementById('save').addEventListener('click', function (e) {
+function onSaveResourcePack(event) {
     try {
-        let text = editor.getValue();
-        let res = {};
-        for (let [k, v] of Object.entries(JSON.parse(text))) {
-            res[k] = toUnicode(v);
-        }
-        text = JSON.stringify(res, null, 4);
-        text = text.replace(/\\\\u/g, '\\u');
-        //download(text, filename, "text")
-        let langKey = `uk_ua`;
+        let text = toUtf16Json(editor.getValue());
+        let langKey = model.languageCode;
         let filename = `${langKey}.json`;
-        var zip = new JSZip();
+        let zip = new JSZip();
         let metaObject = {
             "pack": {
-                "pack_format": 4,  // 1.14
-                "description": "UA fixed"
+                "pack_format": versions[model.version].pack_format,
+                "description": "Ukrainian language resource pack"
             },
             "language": {
                 [langKey]: {
@@ -96,29 +106,27 @@ document.getElementById('save').addEventListener('click', function (e) {
             }
         };
         zip.file("pack.mcmeta", JSON.stringify(metaObject, null, 4));
-        var langFolder = zip.folder("assets/minecraft/lang");
+        let langFolder = zip.folder("assets/minecraft/lang");
         langFolder.file(`${filename}`, text, { base64: false });
         zip.generateAsync({ type: "blob" })
             .then(function (content) {
-                download(content, "pack.zip", "blob");
+                download(content, `${model.languageCode}_resourcepack.zip`, "blob");
             })
-            .catch(err => alert(`Помилка: ${err}`));
+            .catch(err => alert(`Помилка збереження ресурспаку: ${err}`));
     } catch (err) {
-        alert(`Помилка: ${err}`)
+        alert(`Помилка створення ресурспаку: ${err}`)
     }
 
-}, false);
-
-
+}
 
 // Function to download data to a file
 function download(data, filename, type) {
-    var file = new Blob([data], { type: type });
+    let file = new Blob([data], { type: type });
     if (window.navigator.msSaveOrOpenBlob) // IE10+
         window.navigator.msSaveOrOpenBlob(file, filename);
     else { // Others
-        var a = document.createElement("a"),
-            url = URL.createObjectURL(file);
+        let a = document.createElement("a");
+        let url = URL.createObjectURL(file);
         a.href = url;
         a.download = filename;
         document.body.appendChild(a);
@@ -129,3 +137,33 @@ function download(data, filename, type) {
         }, 0);
     }
 }
+
+function parse(text) {
+    let originalText = text;
+    let jsonObj = JSON.parse(originalText);
+    let stringifiedText = JSON.stringify(jsonObj, null, 4);
+    return stringifiedText;
+}
+
+function toUtf16Json(str) {
+    let res = {};
+    for (let [k, v] of Object.entries(JSON.parse(str))) {
+        res[k] = toUnicode(v);
+    }
+    let text = JSON.stringify(res, null, 4);
+    text = text.replace(/\\\\u/g, '\\u');
+    return text;
+}
+
+function toUnicode(str) {
+    let result = "";
+    for (let i = 0; i < str.length; i++) {
+        // Assumption: all characters are < 0xffff
+        let code = str[i].charCodeAt(0);
+        if (code > 127)
+            result += "\\u" + ("000" + code.toString(16)).substr(-4);
+        else
+            result += str[i]
+    }
+    return result;
+};
