@@ -3,13 +3,15 @@ const defaultVersion = `1.14`;
 const defaultLanguageCode = `uk_ua`;
 
 const model = {
+    input_type: `type_new`,
     languageCode: defaultLanguageCode,
     uploaded: {
+        filename: ``,
         pack_format: defaultPackFormat,
         lang: ``,
     },
-    download: {
-        version: defaultVersion,
+    current: {
+        lang: ``,
     }
 };
 
@@ -33,10 +35,10 @@ document.getElementById('new_format').addEventListener('change', onVersionChange
 onVersionChange();
 
 function onDownloadVersionChange(event) {
-    model.download.version = event.target.value
+    let downloadVersion = document.getElementById('download_format').value
     try {
-        let currentJson = JSON.parse(editor.getValue());
-        fetchLangFileJson(model.download.version, model.languageCode)
+        let currentJson = JSON.parse(model.current.lang);
+        fetchLangFileJson(downloadVersion, model.languageCode)
             .then(selectedJson => {
                 let newJson = Object.assign({}, selectedJson, currentJson);
                 editor.setValue(JSON.stringify(newJson, null, 4))
@@ -74,8 +76,11 @@ function onVersionChange(event) {
     model.version = version;
     fetchLangFileJson(version, model.languageCode)
         .then(data => {
-            editor.setValue(JSON.stringify(data, null, 4))
+            let text = JSON.stringify(data, null, 4);
+            editor.setValue(text)
+            model.current.lang = text;
             document.getElementById('type_new').checked = true;
+            model.input_type = 'type_new';
             document.querySelector(`#download_format option[value='${version}']`).selected = true;
         })
         .catch(err => alert(`Помилка зміни версії: ${err}`));
@@ -112,16 +117,21 @@ function handleFileSelect(evt) {
                         if (!format) {
                             throw new Error('Ця версія Minecraft не підтримується')
                         }
-                        document.querySelector(`#upload_format option[value='${uploadFormat}']`).setAttribute('selected', true);
-                        // @todo save as loaded format and show update button on format mismatch
+                        document.querySelector(`#upload_format option[value='${uploadFormat}']`).selected = true;
+                        let version = format.versions[format.versions.length - 1]
+                        document.querySelector(`#download_format option[value='${version}']`).selected = true;
+                        //
+                        model.uploaded.filename = theFile.name
+                        model.uploaded.pack_format = uploadFormat
                         model.uploaded.lang = lang;
-                        return lang;
+                        model.current.lang = lang;
+                        //
+                        onDownloadVersionChange()
                     })
-                    .then(parse)
-                    .then(editor.setValue.bind(editor))
                     .catch(err => alert(err));
             }
             document.getElementById('type_upload').checked = true;
+            model.input_type = 'type_upload';
         };
     })(f);
 
@@ -134,8 +144,12 @@ function handleFileSelect(evt) {
 
 function onSaveResourcePack(event) {
     try {
-        let currentJson = JSON.parse(editor.getValue());
-        fetchLangFileJson(model.download.version, model.languageCode)
+        let text = editor.getValue();
+        if (!text) 
+            throw new Error(`Пусто`);
+        let currentJson = JSON.parse(text);
+        let downloadVersion = document.getElementById('download_format').value
+        fetchLangFileJson(downloadVersion, model.languageCode)
             .then(selectedJson => {
                 let newJson = Object.assign({}, selectedJson, currentJson);
                 let text = toUtf16Json(newJson);
@@ -144,7 +158,7 @@ function onSaveResourcePack(event) {
                 let zip = new JSZip();
                 let metaObject = {
                     "pack": {
-                        "pack_format": formats.find(x => x.versions.includes(model.download.version)).pack_format,
+                        "pack_format": formats.find(x => x.versions.includes(downloadVersion)).pack_format,
                         "description": "Ukrainian language resource pack"
                     },
                     "language": {
@@ -161,7 +175,10 @@ function onSaveResourcePack(event) {
                 return zip.generateAsync({ type: "blob" })
             })
             .then(function (content) {
-                download(content, `${model.languageCode}_resourcepack.zip`, "blob");
+                let filename = (model.type === `type_new` || model.uploaded.filename === '')
+                    ? `${model.languageCode}_resourcepack.zip`
+                    : model.uploaded.filename
+                download(content, filename, "blob");
             })
             .catch(err => alert(`Помилка збереження ресурспаку: ${err}`));
     } catch (err) {
