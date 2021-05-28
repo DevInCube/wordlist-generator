@@ -102,6 +102,7 @@ function processFile(inText, trackNo, fromOffset, toOffset)
 {
     const outText = inText
         .split(`\r\n`)
+        .filter(i => i.trim().length > 0)
         .map(i => i.split(`\t`))
         .map((val, ind) => createDescriptor(`Word#${ind}`, trackNo, Math.max(0, round(+val[0] + fromOffset)), round(+val[1] + toOffset)))
         .join(`\r\n`);
