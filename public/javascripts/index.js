@@ -50,6 +50,17 @@ function handleSettingsChange()
     editor.setValue(outText);
 }
 
+function onSaveResourcePack(event) {
+    try {
+        let text = editor.getValue();
+        if (!text) 
+            throw new Error(`Пусто`);
+        download(text, model.filename + '.xml', "blob");
+    } catch (err) {
+        alert(`Помилка створення ресурспаку: ${err}`)
+    }
+}
+
 // Function to download data to a file
 function download(data, filename, type) {
     let file = new Blob([data], { type: type });
@@ -69,6 +80,8 @@ function download(data, filename, type) {
     }
 }
 
+
+//=================
 function createDescriptor(text, trackNo, from, to)
 {
     return `  <WordDescriptor>
